@@ -54,20 +54,27 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Domain
-echo -e "${CYAN}📌 Enter your domain (e.g., n8n.example.com):${NC}"
-read -p "   Domain: " DOMAIN
+DOMAIN=""
 while [ -z "$DOMAIN" ]; do
-    echo -e "${RED}   Domain cannot be empty!${NC}"
-    read -p "   Domain: " DOMAIN
+    echo -e "${CYAN}📌 Enter your domain (e.g., n8n.example.com):${NC}"
+    echo -n "   Domain: "
+    read DOMAIN </dev/tty
+    if [ -z "$DOMAIN" ]; then
+        echo -e "${RED}   Domain cannot be empty!${NC}"
+        echo ""
+    fi
 done
 
 # Email
-echo ""
-echo -e "${CYAN}📧 Enter your email (for SSL certificate):${NC}"
-read -p "   Email: " EMAIL
+EMAIL=""
 while [ -z "$EMAIL" ]; do
-    echo -e "${RED}   Email cannot be empty!${NC}"
-    read -p "   Email: " EMAIL
+    echo ""
+    echo -e "${CYAN}📧 Enter your email (for SSL certificate):${NC}"
+    echo -n "   Email: "
+    read EMAIL </dev/tty
+    if [ -z "$EMAIL" ]; then
+        echo -e "${RED}   Email cannot be empty!${NC}"
+    fi
 done
 
 # Timezone
@@ -82,7 +89,8 @@ echo "   6) Europe/London (UK)"
 echo "   7) America/New_York (USA East)"
 echo "   8) UTC"
 echo "   9) Custom"
-read -p "   Choose [1-9] (default: 1): " TZ_CHOICE
+echo -n "   Choose [1-9] (default: 1): "
+read TZ_CHOICE </dev/tty
 
 case $TZ_CHOICE in
     2) TIMEZONE="Asia/Dubai" ;;
@@ -92,41 +100,73 @@ case $TZ_CHOICE in
     6) TIMEZONE="Europe/London" ;;
     7) TIMEZONE="America/New_York" ;;
     8) TIMEZONE="UTC" ;;
-    9) read -p "   Enter timezone: " TIMEZONE ;;
+    9) 
+        echo -n "   Enter timezone: "
+        read TIMEZONE </dev/tty
+        ;;
     *) TIMEZONE="Asia/Riyadh" ;;
 esac
 
 # Port
 echo ""
 echo -e "${CYAN}🔌 n8n internal port (default: 5678):${NC}"
-read -p "   Port: " PORT
-PORT=${PORT:-5678}
+echo -n "   Port: "
+read PORT_INPUT </dev/tty
+if [ -z "$PORT_INPUT" ]; then
+    PORT=5678
+else
+    PORT=$PORT_INPUT
+fi
 
 # SSL Choice
 echo ""
 echo -e "${CYAN}🔒 Install SSL certificate?${NC}"
 echo "   1) Yes - Let's Encrypt (recommended)"
 echo "   2) No - HTTP only"
-read -p "   Choose [1-2] (default: 1): " SSL_CHOICE
-SSL_CHOICE=${SSL_CHOICE:-1}
+echo -n "   Choose [1-2] (default: 1): "
+read SSL_CHOICE </dev/tty
+if [ -z "$SSL_CHOICE" ]; then
+    SSL_CHOICE=1
+fi
 
 # Basic Auth
 echo ""
 echo -e "${CYAN}🔐 Enable Basic Authentication? (extra security layer)${NC}"
 echo "   1) No (n8n has its own login)"
 echo "   2) Yes"
-read -p "   Choose [1-2] (default: 1): " AUTH_CHOICE
-AUTH_CHOICE=${AUTH_CHOICE:-1}
+echo -n "   Choose [1-2] (default: 1): "
+read AUTH_CHOICE </dev/tty
+if [ -z "$AUTH_CHOICE" ]; then
+    AUTH_CHOICE=1
+fi
 
+BASIC_USER=""
+BASIC_PASS=""
 if [ "$AUTH_CHOICE" == "2" ]; then
-    read -p "   Username: " BASIC_USER
-    read -s -p "   Password: " BASIC_PASS
+    echo -n "   Username: "
+    read BASIC_USER </dev/tty
+    echo -n "   Password: "
+    read -s BASIC_PASS </dev/tty
     echo ""
 fi
 
 # ==============================================
 #           CONFIRM SETTINGS
 # ==============================================
+
+if [ "$SSL_CHOICE" == "1" ]; then
+    SSL_TEXT="${GREEN}Yes (Let's Encrypt)${NC}"
+    PROTOCOL="https"
+else
+    SSL_TEXT="${RED}No (HTTP only)${NC}"
+    PROTOCOL="http"
+fi
+
+if [ "$AUTH_CHOICE" == "2" ]; then
+    AUTH_TEXT="${GREEN}Yes (User: $BASIC_USER)${NC}"
+else
+    AUTH_TEXT="No"
+fi
 
 echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -137,23 +177,16 @@ echo -e "   ${BLUE}Domain:${NC}     $DOMAIN"
 echo -e "   ${BLUE}Email:${NC}      $EMAIL"
 echo -e "   ${BLUE}Timezone:${NC}   $TIMEZONE"
 echo -e "   ${BLUE}Port:${NC}       $PORT"
-if [ "$SSL_CHOICE" == "1" ]; then
-    echo -e "   ${BLUE}SSL:${NC}        ${GREEN}Yes (Let's Encrypt)${NC}"
-    PROTOCOL="https"
-else
-    echo -e "   ${BLUE}SSL:${NC}        ${RED}No (HTTP only)${NC}"
-    PROTOCOL="http"
-fi
-if [ "$AUTH_CHOICE" == "2" ]; then
-    echo -e "   ${BLUE}Basic Auth:${NC} ${GREEN}Yes${NC}"
-else
-    echo -e "   ${BLUE}Basic Auth:${NC} No"
-fi
+echo -e "   ${BLUE}SSL:${NC}        $SSL_TEXT"
+echo -e "   ${BLUE}Basic Auth:${NC} $AUTH_TEXT"
 echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-read -p "Continue with installation? [Y/n]: " CONFIRM
-CONFIRM=${CONFIRM:-Y}
+echo -n "Continue with installation? [Y/n]: "
+read CONFIRM </dev/tty
+if [ -z "$CONFIRM" ]; then
+    CONFIRM="Y"
+fi
 
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
     echo -e "${RED}Installation cancelled.${NC}"
@@ -238,9 +271,9 @@ AUTH_CONFIG=""
 if [ "$AUTH_CHOICE" == "2" ]; then
     apt install -y apache2-utils > /dev/null 2>&1
     htpasswd -cb /etc/nginx/.htpasswd "$BASIC_USER" "$BASIC_PASS" > /dev/null 2>&1
-    AUTH_CONFIG="
-        auth_basic \"n8n Protected\";
-        auth_basic_user_file /etc/nginx/.htpasswd;"
+    AUTH_CONFIG='
+        auth_basic "n8n Protected";
+        auth_basic_user_file /etc/nginx/.htpasswd;'
 fi
 
 cat > /etc/nginx/sites-available/${DOMAIN} <<EOF
@@ -261,8 +294,7 @@ server {
         proxy_cache off;
         proxy_read_timeout 300s;
         proxy_connect_timeout 300s;
-        chunked_transfer_encoding off;
-        ${AUTH_CONFIG}
+        chunked_transfer_encoding off;${AUTH_CONFIG}
     }
 }
 EOF
@@ -317,26 +349,26 @@ echo "║                                                           ║"
 echo "║        🎉 Installation Complete! 🎉                       ║"
 echo "║                                                           ║"
 echo "╠═══════════════════════════════════════════════════════════╣"
-echo "║                                                           ║"
-echo "║  🌐 Access n8n at:                                        ║"
-echo "║     ${PROTOCOL}://${DOMAIN}"
-echo "║                                                           ║"
-if [ "$AUTH_CHOICE" == "2" ]; then
-echo "║  🔐 Basic Auth:                                           ║"
-echo "║     Username: ${BASIC_USER}"
-echo "║     Password: [hidden]                                    ║"
-echo "║                                                           ║"
-fi
-echo "║  📋 Commands:                                             ║"
-echo "║     Status:   systemctl status n8n                        ║"
-echo "║     Logs:     journalctl -u n8n -f                        ║"
-echo "║     Restart:  systemctl restart n8n                       ║"
-echo "║     Stop:     systemctl stop n8n                          ║"
-echo "║                                                           ║"
-echo "║  📁 Data Directory: /home/n8n/.n8n                        ║"
-echo "║                                                           ║"
-echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
+echo -e "  🌐 ${CYAN}Access n8n at:${NC}"
+echo -e "     ${GREEN}${PROTOCOL}://${DOMAIN}${NC}"
+echo ""
+if [ "$AUTH_CHOICE" == "2" ]; then
+echo -e "  🔐 ${CYAN}Basic Auth:${NC}"
+echo -e "     Username: ${BASIC_USER}"
+echo -e "     Password: [hidden]"
+echo ""
+fi
+echo -e "  📋 ${CYAN}Commands:${NC}"
+echo -e "     Status:   ${YELLOW}systemctl status n8n${NC}"
+echo -e "     Logs:     ${YELLOW}journalctl -u n8n -f${NC}"
+echo -e "     Restart:  ${YELLOW}systemctl restart n8n${NC}"
+echo -e "     Stop:     ${YELLOW}systemctl stop n8n${NC}"
+echo ""
+echo -e "  📁 ${CYAN}Data Directory:${NC} /home/n8n/.n8n"
+echo ""
+echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
+echo ""
 echo -e "   n8n Status: ${STATUS}"
 echo ""
 echo -e "${CYAN}   Open your browser and create your admin account!${NC}"

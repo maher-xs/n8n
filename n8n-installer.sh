@@ -1,16 +1,57 @@
 #!/bin/bash
 
 # ==============================================
-#        n8n Interactive Installer
+#        n8n Interactive Installer v2
 #        For Ubuntu 20.04 / 22.04 / 24.04
+#        Step by Step Installation
 # ==============================================
 
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+# Function to read input properly
+ask() {
+    local prompt="$1"
+    local var_name="$2"
+    local default="$3"
+    local result=""
+    
+    if [ -n "$default" ]; then
+        echo -ne "${CYAN}${prompt}${NC} [${default}]: "
+    else
+        echo -ne "${CYAN}${prompt}${NC}: "
+    fi
+    
+    read result < /dev/tty
+    
+    if [ -z "$result" ] && [ -n "$default" ]; then
+        result="$default"
+    fi
+    
+    eval "$var_name='$result'"
+}
+
+# Function to ask yes/no
+ask_yn() {
+    local prompt="$1"
+    local var_name="$2"
+    local default="$3"
+    local result=""
+    
+    echo -ne "${CYAN}${prompt}${NC} [${default}]: "
+    read result < /dev/tty
+    
+    if [ -z "$result" ]; then
+        result="$default"
+    fi
+    
+    eval "$var_name='$result'"
+}
 
 clear
 echo -e "${CYAN}"
@@ -23,19 +64,20 @@ echo "║     ██║╚██╗██║██╔══██╗██║╚
 echo "║     ██║ ╚████║╚█████╔╝██║ ╚████║                      ║"
 echo "║     ╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═══╝                      ║"
 echo "║                                                       ║"
-echo "║         🚀 n8n Auto Installer v1.0 🚀                 ║"
+echo "║         🚀 n8n Auto Installer v2.0 🚀                 ║"
 echo "║                                                       ║"
 echo "╚═══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
 # Check root
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}❌ Please run as root: sudo bash n8n-installer.sh${NC}"
+    echo -e "${RED}❌ Please run as root!${NC}"
+    echo -e "${YELLOW}Use: sudo bash n8n-installer.sh${NC}"
     exit 1
 fi
 
 # Check Ubuntu
-if ! grep -q "Ubuntu" /etc/os-release; then
+if ! grep -q "Ubuntu" /etc/os-release 2>/dev/null; then
     echo -e "${RED}❌ This script is for Ubuntu only!${NC}"
     exit 1
 fi
@@ -43,42 +85,39 @@ fi
 echo -e "${GREEN}✓ Running as root${NC}"
 echo -e "${GREEN}✓ Ubuntu detected${NC}"
 echo ""
-
-# ==============================================
-#           GET USER INPUT
-# ==============================================
-
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}                   CONFIGURATION                       ${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Domain
+# ============ STEP 1: DOMAIN ============
+echo -e "${GREEN}Step 1/6: Domain${NC}"
 DOMAIN=""
 while [ -z "$DOMAIN" ]; do
-    echo -e "${CYAN}📌 Enter your domain (e.g., n8n.example.com):${NC}"
-    echo -n "   Domain: "
-    read DOMAIN </dev/tty
+    ask "📌 Enter your domain (e.g., n8n.example.com)" "DOMAIN" ""
     if [ -z "$DOMAIN" ]; then
-        echo -e "${RED}   Domain cannot be empty!${NC}"
+        echo -e "${RED}   ❌ Domain cannot be empty! Try again.${NC}"
         echo ""
     fi
 done
+echo -e "${GREEN}   ✓ Domain: ${DOMAIN}${NC}"
+echo ""
 
-# Email
+# ============ STEP 2: EMAIL ============
+echo -e "${GREEN}Step 2/6: Email${NC}"
 EMAIL=""
 while [ -z "$EMAIL" ]; do
-    echo ""
-    echo -e "${CYAN}📧 Enter your email (for SSL certificate):${NC}"
-    echo -n "   Email: "
-    read EMAIL </dev/tty
+    ask "📧 Enter your email (for SSL certificate)" "EMAIL" ""
     if [ -z "$EMAIL" ]; then
-        echo -e "${RED}   Email cannot be empty!${NC}"
+        echo -e "${RED}   ❌ Email cannot be empty! Try again.${NC}"
+        echo ""
     fi
 done
-
-# Timezone
+echo -e "${GREEN}   ✓ Email: ${EMAIL}${NC}"
 echo ""
+
+# ============ STEP 3: TIMEZONE ============
+echo -e "${GREEN}Step 3/6: Timezone${NC}"
 echo -e "${CYAN}🌍 Select your timezone:${NC}"
 echo "   1) Asia/Riyadh (Saudi Arabia)"
 echo "   2) Asia/Dubai (UAE)"
@@ -89,10 +128,10 @@ echo "   6) Europe/London (UK)"
 echo "   7) America/New_York (USA East)"
 echo "   8) UTC"
 echo "   9) Custom"
-echo -n "   Choose [1-9] (default: 1): "
-read TZ_CHOICE </dev/tty
+ask "   Choose" "TZ_CHOICE" "1"
 
 case $TZ_CHOICE in
+    1) TIMEZONE="Asia/Riyadh" ;;
     2) TIMEZONE="Asia/Dubai" ;;
     3) TIMEZONE="Africa/Cairo" ;;
     4) TIMEZONE="Asia/Amman" ;;
@@ -100,96 +139,79 @@ case $TZ_CHOICE in
     6) TIMEZONE="Europe/London" ;;
     7) TIMEZONE="America/New_York" ;;
     8) TIMEZONE="UTC" ;;
-    9) 
-        echo -n "   Enter timezone: "
-        read TIMEZONE </dev/tty
-        ;;
+    9) ask "   Enter custom timezone" "TIMEZONE" "UTC" ;;
     *) TIMEZONE="Asia/Riyadh" ;;
 esac
-
-# Port
+echo -e "${GREEN}   ✓ Timezone: ${TIMEZONE}${NC}"
 echo ""
-echo -e "${CYAN}🔌 n8n internal port (default: 5678):${NC}"
-echo -n "   Port: "
-read PORT_INPUT </dev/tty
-if [ -z "$PORT_INPUT" ]; then
-    PORT=5678
-else
-    PORT=$PORT_INPUT
-fi
 
-# SSL Choice
+# ============ STEP 4: PORT ============
+echo -e "${GREEN}Step 4/6: Port${NC}"
+ask "🔌 n8n internal port" "PORT" "5678"
+echo -e "${GREEN}   ✓ Port: ${PORT}${NC}"
 echo ""
-echo -e "${CYAN}🔒 Install SSL certificate?${NC}"
+
+# ============ STEP 5: SSL ============
+echo -e "${GREEN}Step 5/6: SSL Certificate${NC}"
+echo -e "${CYAN}🔒 Install SSL certificate (HTTPS)?${NC}"
 echo "   1) Yes - Let's Encrypt (recommended)"
 echo "   2) No - HTTP only"
-echo -n "   Choose [1-2] (default: 1): "
-read SSL_CHOICE </dev/tty
-if [ -z "$SSL_CHOICE" ]; then
-    SSL_CHOICE=1
-fi
+ask "   Choose" "SSL_CHOICE" "1"
 
-# Basic Auth
-echo ""
-echo -e "${CYAN}🔐 Enable Basic Authentication? (extra security layer)${NC}"
-echo "   1) No (n8n has its own login)"
-echo "   2) Yes"
-echo -n "   Choose [1-2] (default: 1): "
-read AUTH_CHOICE </dev/tty
-if [ -z "$AUTH_CHOICE" ]; then
-    AUTH_CHOICE=1
+if [ "$SSL_CHOICE" == "1" ]; then
+    PROTOCOL="https"
+    SSL_TEXT="${GREEN}Yes (Let's Encrypt)${NC}"
+else
+    PROTOCOL="http"
+    SSL_TEXT="${YELLOW}No (HTTP only)${NC}"
 fi
+echo -e "${GREEN}   ✓ SSL: ${SSL_TEXT}${NC}"
+echo ""
+
+# ============ STEP 6: BASIC AUTH ============
+echo -e "${GREEN}Step 6/6: Basic Authentication${NC}"
+echo -e "${CYAN}🔐 Enable Basic Auth? (extra security layer)${NC}"
+echo "   1) No - n8n has its own login"
+echo "   2) Yes - Add extra password protection"
+ask "   Choose" "AUTH_CHOICE" "1"
 
 BASIC_USER=""
 BASIC_PASS=""
 if [ "$AUTH_CHOICE" == "2" ]; then
-    echo -n "   Username: "
-    read BASIC_USER </dev/tty
-    echo -n "   Password: "
-    read -s BASIC_PASS </dev/tty
     echo ""
+    ask "   Enter username" "BASIC_USER" "admin"
+    echo -ne "${CYAN}   Enter password${NC}: "
+    read -s BASIC_PASS < /dev/tty
+    echo ""
+    AUTH_TEXT="${GREEN}Yes (User: ${BASIC_USER})${NC}"
+else
+    AUTH_TEXT="No"
 fi
+echo -e "${GREEN}   ✓ Basic Auth: ${AUTH_TEXT}${NC}"
+echo ""
 
 # ==============================================
 #           CONFIRM SETTINGS
 # ==============================================
 
-if [ "$SSL_CHOICE" == "1" ]; then
-    SSL_TEXT="${GREEN}Yes (Let's Encrypt)${NC}"
-    PROTOCOL="https"
-else
-    SSL_TEXT="${RED}No (HTTP only)${NC}"
-    PROTOCOL="http"
-fi
-
-if [ "$AUTH_CHOICE" == "2" ]; then
-    AUTH_TEXT="${GREEN}Yes (User: $BASIC_USER)${NC}"
-else
-    AUTH_TEXT="No"
-fi
-
-echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}                 CONFIRM SETTINGS                      ${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "   ${BLUE}Domain:${NC}     $DOMAIN"
-echo -e "   ${BLUE}Email:${NC}      $EMAIL"
-echo -e "   ${BLUE}Timezone:${NC}   $TIMEZONE"
-echo -e "   ${BLUE}Port:${NC}       $PORT"
+echo -e "   ${BLUE}Domain:${NC}     ${GREEN}$DOMAIN${NC}"
+echo -e "   ${BLUE}Email:${NC}      ${GREEN}$EMAIL${NC}"
+echo -e "   ${BLUE}Timezone:${NC}   ${GREEN}$TIMEZONE${NC}"
+echo -e "   ${BLUE}Port:${NC}       ${GREEN}$PORT${NC}"
 echo -e "   ${BLUE}SSL:${NC}        $SSL_TEXT"
 echo -e "   ${BLUE}Basic Auth:${NC} $AUTH_TEXT"
 echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -n "Continue with installation? [Y/n]: "
-read CONFIRM </dev/tty
-if [ -z "$CONFIRM" ]; then
-    CONFIRM="Y"
-fi
+
+ask_yn "🚀 Start installation?" "CONFIRM" "Y"
 
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-    echo -e "${RED}Installation cancelled.${NC}"
+    echo -e "${RED}❌ Installation cancelled.${NC}"
     exit 0
 fi
 
@@ -198,39 +220,42 @@ fi
 # ==============================================
 
 echo ""
-echo -e "${GREEN}🚀 Starting installation...${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}              STARTING INSTALLATION                    ${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
 # Step 1: Update System
-echo -e "${YELLOW}[1/10] 📦 Updating system...${NC}"
-apt update && apt upgrade -y > /dev/null 2>&1
-echo -e "${GREEN}   ✓ System updated${NC}"
+echo -ne "${YELLOW}[1/10] 📦 Updating system...${NC}"
+apt update -y > /dev/null 2>&1 && apt upgrade -y > /dev/null 2>&1
+echo -e "\r${GREEN}[1/10] ✓ System updated                    ${NC}"
 
 # Step 2: Install dependencies
-echo -e "${YELLOW}[2/10] 📦 Installing dependencies...${NC}"
+echo -ne "${YELLOW}[2/10] 📦 Installing dependencies...${NC}"
 apt install -y curl wget gnupg2 ca-certificates lsb-release apt-transport-https > /dev/null 2>&1
-echo -e "${GREEN}   ✓ Dependencies installed${NC}"
+echo -e "\r${GREEN}[2/10] ✓ Dependencies installed            ${NC}"
 
 # Step 3: Install Node.js
-echo -e "${YELLOW}[3/10] 📦 Installing Node.js 18...${NC}"
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash - > /dev/null 2>&1
+echo -ne "${YELLOW}[3/10] 📦 Installing Node.js 18...${NC}"
+curl -fsSL https://deb.nodesource.com/setup_18.x 2>/dev/null | bash - > /dev/null 2>&1
 apt install -y nodejs > /dev/null 2>&1
-echo -e "${GREEN}   ✓ Node.js $(node -v) installed${NC}"
+NODE_VER=$(node -v 2>/dev/null || echo "unknown")
+echo -e "\r${GREEN}[3/10] ✓ Node.js ${NODE_VER} installed          ${NC}"
 
 # Step 4: Install n8n
-echo -e "${YELLOW}[4/10] 📦 Installing n8n...${NC}"
+echo -ne "${YELLOW}[4/10] 📦 Installing n8n (this may take a while)...${NC}"
 npm install -g n8n > /dev/null 2>&1
-echo -e "${GREEN}   ✓ n8n installed${NC}"
+echo -e "\r${GREEN}[4/10] ✓ n8n installed                           ${NC}"
 
 # Step 5: Create user
-echo -e "${YELLOW}[5/10] 👤 Creating n8n user...${NC}"
+echo -ne "${YELLOW}[5/10] 👤 Creating n8n user...${NC}"
 id -u n8n &>/dev/null || useradd -m -s /bin/bash n8n
 mkdir -p /home/n8n/.n8n
 chown -R n8n:n8n /home/n8n/.n8n
-echo -e "${GREEN}   ✓ User created${NC}"
+echo -e "\r${GREEN}[5/10] ✓ n8n user created              ${NC}"
 
 # Step 6: Create systemd service
-echo -e "${YELLOW}[6/10] ⚙️  Creating systemd service...${NC}"
+echo -ne "${YELLOW}[6/10] ⚙️  Creating systemd service...${NC}"
 cat > /etc/systemd/system/n8n.service <<EOF
 [Unit]
 Description=n8n Workflow Automation
@@ -256,17 +281,16 @@ EOF
 systemctl daemon-reload
 systemctl enable n8n > /dev/null 2>&1
 systemctl start n8n
-echo -e "${GREEN}   ✓ Service created and started${NC}"
+echo -e "\r${GREEN}[6/10] ✓ Systemd service created         ${NC}"
 
 # Step 7: Install Nginx
-echo -e "${YELLOW}[7/10] 📦 Installing Nginx...${NC}"
+echo -ne "${YELLOW}[7/10] 📦 Installing Nginx...${NC}"
 apt install -y nginx > /dev/null 2>&1
-echo -e "${GREEN}   ✓ Nginx installed${NC}"
+echo -e "\r${GREEN}[7/10] ✓ Nginx installed              ${NC}"
 
 # Step 8: Configure Nginx
-echo -e "${YELLOW}[8/10] ⚙️  Configuring Nginx...${NC}"
+echo -ne "${YELLOW}[8/10] ⚙️  Configuring Nginx...${NC}"
 
-# Basic Auth setup if enabled
 AUTH_CONFIG=""
 if [ "$AUTH_CHOICE" == "2" ]; then
     apt install -y apache2-utils > /dev/null 2>&1
@@ -303,73 +327,68 @@ ln -sf /etc/nginx/sites-available/${DOMAIN} /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t > /dev/null 2>&1
 systemctl reload nginx
-echo -e "${GREEN}   ✓ Nginx configured${NC}"
+echo -e "\r${GREEN}[8/10] ✓ Nginx configured              ${NC}"
 
 # Step 9: SSL Certificate
 if [ "$SSL_CHOICE" == "1" ]; then
-    echo -e "${YELLOW}[9/10] 🔒 Installing SSL certificate...${NC}"
+    echo -ne "${YELLOW}[9/10] 🔒 Installing SSL certificate...${NC}"
     apt install -y certbot python3-certbot-nginx > /dev/null 2>&1
     certbot --nginx -d ${DOMAIN} --non-interactive --agree-tos -m ${EMAIL} --redirect > /dev/null 2>&1
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}   ✓ SSL certificate installed${NC}"
+        echo -e "\r${GREEN}[9/10] ✓ SSL certificate installed       ${NC}"
     else
-        echo -e "${RED}   ✗ SSL failed - check DNS settings${NC}"
+        echo -e "\r${RED}[9/10] ✗ SSL failed (check DNS!)         ${NC}"
         PROTOCOL="http"
     fi
 else
-    echo -e "${YELLOW}[9/10] ⏭️  Skipping SSL...${NC}"
+    echo -e "${YELLOW}[9/10] ⏭️  Skipping SSL (HTTP only)${NC}"
 fi
 
 # Step 10: Final setup
-echo -e "${YELLOW}[10/10] 🔧 Final setup...${NC}"
+echo -ne "${YELLOW}[10/10] 🔧 Final setup...${NC}"
 systemctl restart n8n
 sleep 3
-
-# Open firewall
 ufw allow 80 > /dev/null 2>&1
 ufw allow 443 > /dev/null 2>&1
 
-# Check status
 if systemctl is-active --quiet n8n; then
     STATUS="${GREEN}✓ Running${NC}"
 else
     STATUS="${RED}✗ Not Running${NC}"
 fi
-
-echo -e "${GREEN}   ✓ Installation complete${NC}"
+echo -e "\r${GREEN}[10/10] ✓ Final setup complete          ${NC}"
 
 # ==============================================
 #           FINAL OUTPUT
 # ==============================================
 
 echo ""
-echo -e "${GREEN}"
-echo "╔═══════════════════════════════════════════════════════════╗"
+echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗"
 echo "║                                                           ║"
-echo "║        🎉 Installation Complete! 🎉                       ║"
+echo "║        🎉 INSTALLATION COMPLETE! 🎉                       ║"
 echo "║                                                           ║"
-echo "╠═══════════════════════════════════════════════════════════╣"
-echo -e "${NC}"
-echo -e "  🌐 ${CYAN}Access n8n at:${NC}"
+echo -e "╚═══════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "  🌐 ${CYAN}Your n8n is ready at:${NC}"
 echo -e "     ${GREEN}${PROTOCOL}://${DOMAIN}${NC}"
 echo ""
 if [ "$AUTH_CHOICE" == "2" ]; then
-echo -e "  🔐 ${CYAN}Basic Auth:${NC}"
-echo -e "     Username: ${BASIC_USER}"
-echo -e "     Password: [hidden]"
+echo -e "  🔐 ${CYAN}Basic Auth Credentials:${NC}"
+echo -e "     Username: ${GREEN}${BASIC_USER}${NC}"
+echo -e "     Password: ${GREEN}[as you set]${NC}"
 echo ""
 fi
-echo -e "  📋 ${CYAN}Commands:${NC}"
-echo -e "     Status:   ${YELLOW}systemctl status n8n${NC}"
-echo -e "     Logs:     ${YELLOW}journalctl -u n8n -f${NC}"
-echo -e "     Restart:  ${YELLOW}systemctl restart n8n${NC}"
-echo -e "     Stop:     ${YELLOW}systemctl stop n8n${NC}"
+echo -e "  📋 ${CYAN}Useful Commands:${NC}"
+echo -e "     Check status:  ${YELLOW}systemctl status n8n${NC}"
+echo -e "     View logs:     ${YELLOW}journalctl -u n8n -f${NC}"
+echo -e "     Restart n8n:   ${YELLOW}systemctl restart n8n${NC}"
+echo -e "     Stop n8n:      ${YELLOW}systemctl stop n8n${NC}"
 echo ""
-echo -e "  📁 ${CYAN}Data Directory:${NC} /home/n8n/.n8n"
+echo -e "  📁 ${CYAN}Data location:${NC} /home/n8n/.n8n"
 echo ""
-echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
+echo -e "  ⚡ ${CYAN}n8n Status:${NC} ${STATUS}"
 echo ""
-echo -e "   n8n Status: ${STATUS}"
-echo ""
-echo -e "${CYAN}   Open your browser and create your admin account!${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  Open your browser and create your admin account! 🚀${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
